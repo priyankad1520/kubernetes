@@ -1,10 +1,10 @@
-## Service
+# Service
 Service is a Kubernetes object that exposes a group of Pods using labels and selectors.  It provides a stable IP and DNS name to access Pods. 
 - Why we use Service: Pod IPs are dynamic and change on restart.  Service provides stable access to Pods. Acts as a middle layer between users and Pods. 
 - How we use Service: Service uses labels & selectors to identify Pods. It routes traffic to Pods and performs load balancing. Uses ports: targetPort (container), port (service), nodePort (external). 
 - What kind of problem it solves: Fixes dynamic Pod IP issue.  Enables reliable communication inside and outside cluster. Distributes traffic across multiple Pods. 
 
-### Types of Services
+## Types of Services
 1. ClusterIP: Default service type with internal IP. 
 - Why: For communication between Pods inside cluster. 
 - How: Pods access using service name (DNS). 
@@ -37,7 +37,7 @@ Important Concepts
 -	Endpoints → Define which Pods receive traffic 
 -	Ports → targetPort (container), port (service), nodePort (external) 
 
-## Ingress:
+# Ingress:
 Routes external traffic to multiple services using one entry point 
 - Why: Avoid multiple LoadBalancers 
 - How: User → Ingress → Services → Pods 
@@ -80,7 +80,7 @@ Explanation:
 
 Popular Ingress Controllers: NGINX Ingress Controller, Traefik, HAProxy, **Istio Gateway
 
- Responsibilities of an Ingress Controller: HTTP / HTTPS routing, Load balancing, SSL termination, Path-based routing, Domain-based routing, Traffic management 
+Responsibilities of an Ingress Controller: HTTP / HTTPS routing, Load balancing, SSL termination, Path-based routing, Domain-based routing, Traffic management 
 
 Simple Real-World Example:  Think of a hotel reception desk. Guests enter the hotel. The receptionist checks where they need to go. 
 - The receptionist directs them to the correct room.
@@ -89,7 +89,7 @@ Simple Real-World Example:  Think of a hotel reception desk. Guests enter the ho
 - Ingress routing is the process of directing incoming HTTP/HTTPS requests to the appropriate Kubernetes service based on rules such as hostnames or URL paths.
 - Ingress routing is executed by an Ingress Controller like NGINX, which reads the rules defined in the Ingress resource and forwards traffic accordingly. So Ingress decides where the request should go.
 
-#### Types of Ingress Routing
+### Types of Ingress Routing
 1. Path-Based Routing: Traffic is routed using the URL path.
 Example: URL --> Service --> Myapp.com/(Frontend-service) --> Myapp.com/api (Api-service) --> Myapp.com/cart (Cart-service)
 Example configuration:
@@ -130,8 +130,8 @@ In Kubernetes, Secure Ingress means protecting external traffic entering the clu
 - Example attack: Man-in-the-Middle Attack. To prevent this, we use HTTPS.
 
 HTTPS uses SSL/TLS encryption.
-How Secure Ingress Works:Secure Ingress uses TLS certificates and an Ingress Controller such as NGINX.
-What happens: User sends HTTPS request --> Ingress Controller decrypts the SSL traffic --> Traffic is forwarded to the service and pods. This process is called SSL termination.
+- How Secure Ingress Works:Secure Ingress uses TLS certificates and an Ingress Controller such as NGINX.
+- What happens: User sends HTTPS request --> Ingress Controller decrypts the SSL traffic --> Traffic is forwarded to the service and pods. This process is called SSL termination.
 
 TLS Secret in Kubernetes:The SSL certificate must be stored inside Kubernetes as a Secret.
 ```
@@ -141,8 +141,122 @@ Kubectl create secret tls my-tls-secret \
 ```
 This secret contains: SSL certificate and Private key
 
-SSL Passthourgh
-<img width="975" height="382" alt="image" src="https://github.com/user-attachments/assets/e0595cf4-f80c-44a2-996f-4d2ee3b3241e" />
+##  TLS / SSL Passthrough
+**SSL Passthrough = Encrypted traffic goes through load balancer without decryption and is handled only by backend server**
+---
+* **Client sends request using HTTPS**: Data is **encrypted from start (client side)*
+* **Load Balancer receives the request**: It **does NOT decrypt the data**, It just **forwards the encrypted traffic**
+* **Encrypted data goes directly to backend server (app)** and **Decryption happens at backend server**
+---
+### Key Points
+*  Load balancer is just a **traffic forwarder**
+*  It cannot: inspect data, filter content, apply security rules
+* **Security Risk**: If attacker sends malicious data → it goes directly to backend and Load balancer **cannot detect it**
+* **Performance Impact**: Backend server handles decryption → more CPU usage
+Here’s **why we use SSL Passthrough**, explained in simple line format 👇
 
-SSL offloading
-<img width="975" height="351" alt="image" src="https://github.com/user-attachments/assets/5e22c191-e435-4d41-969f-243701e42e28" />
+---
+
+#### Why use SSL Passthrough?
+> SSL Passthrough is used to maintain end-to-end encryption where the load balancer forwards encrypted traffic directly to backend servers without decrypting it.
+* **End-to-end encryption**: Data stays encrypted from **client → backend server**. No one (even load balancer) can read it
+* **Higher security / compliance**: Required in industries like banking, healthcare. Sensitive data is never exposed in the middle
+* **Backend controls SSL**: Certificates are managed on backend servers. Full control over encryption, TLS versions, policies
+* **No data inspection needed**: Use when load balancer **doesn’t need to check content**. Only job = route traffic
+* **Useful for non-HTTP protocols**: Works with TCP-based apps (not just HTTP/HTTPS)
+#### When NOT to use (Important)
+* If you need:
+  * Web Application Firewall (WAF)
+  * Content-based routing (URL/path-based)
+  * Logging or monitoring request data
+
+Because load balancer **can’t see inside encrypted traffic**
+---
+## SSL offloading
+**SSL Offloading = Load balancer decrypts HTTPS and sends plain HTTP to backend to reduce load and improve performance**
+#### What happens in SSL Offloading?
+* **Client sends request using HTTPS** --> Data is **encrypted from client**
+* **Load Balancer receives the request** --> It **decrypts the HTTPS traffic** --> Now data becomes **plain HTTP**
+* **Load Balancer sends request to backend** --> Data goes as **HTTP (not encrypted)**
+* **Backend server (app)**: No need to handle SSL. Just processes normal HTTP request
+#### Key Points
+* Load balancer does **decryption work**
+* Backend server is **lightweight (less CPU usage)**
+* Data between LB → backend is **not secure (HTTP)**
+#### Why we use SSL Offloading?
+* **Improves performance**:  Backend servers don’t waste CPU on SSL and Faster response time
+* **Centralized SSL management**: Certificates handled in one place (load balancer) and Easy to update and manage
+* **Better security features**: Load balancer can: inspect traffic, apply firewall (WAF), do routing (URL-based)
+* **Cost efficient**: No need SSL setup on every backend server
+#### Disadvantage (Important)
+* Data between LB → backend is **not encrypted**
+* Risk of: Man-in-the-middle attacks. Data theft inside network
+
+## SSL Bridge
+**SSL Bridging = Load balancer decrypts HTTPS, inspects it, then re-encrypts and sends it as HTTPS to backend**
+####  What happens in SSL Bridging?
+
+* **Client sends request using HTTPS**: Data is **encrypted from client**
+* **Load Balancer receives the request**: It **decrypts the HTTPS traffic**. Now it can **inspect/check the data**
+* **Load Balancer re-encrypts the data again**: Converts back to **HTTPS**
+* **Data is sent to backend server**: Still **encrypted (HTTPS)**
+* **Backend server**: Decrypts again and processes request
+#### Key Points
+* Encryption from **client → LB → backend (end-to-end)**
+* Load balancer can **inspect traffic**
+* Backend is still **secure (HTTPS)**
+#### Why we use SSL Bridging?
+*  **Best security**: Data is always encrypted (no plain HTTP anywhere)
+*  **Traffic inspection** Load balancer can: detect attacks, apply WAF, filter requests
+*  **Balance of security + control**: Better than Passthrough (no inspection). More secure than Offloading (no plain HTTP)
+*  **Used in enterprises**: Banking, healthcare, secure applications
+####  Disadvantage
+* **More CPU usage**: Decrypt + Encrypt again → extra processing
+
+##  SSL passthough vs Offloding vs Bridging
+#### SSL passthough
+**1. Costly for server:** Backend does all decryption → more CPU
+
+**2.Secure:** End-to-end encryption
+
+**3. L4 (TCP) load balancing:** Works at network level (no content check)
+
+**4. Use when:** You don’t need filtering, rules, cookies, etc.
+
+**5. No inspection:** Load balancer cannot see data
+
+**6. Recommended (in some cases):** When strict encryption is required
+#### SSL Offloding
+**1. Fast processing:** Load balancer handles SSL → backend is free
+
+**2. Less secure:** Data from LB → backend is HTTP (not encrypted)
+
+**3. L7 load balancing:** Can inspect data (URL, headers)
+
+**4. Use when:** Need speed and low latency
+
+**5. Inspection possible:** LB can filter, route, apply WAF
+
+**6. Not recommended for high security:** Because internal traffic is not encrypted
+#### SSL Bridging
+**1. Costly:** Decrypt + re-encrypt → more CPU
+
+**2. Very secure:** Encryption everywhere (no plain HTTP)
+
+**3. L7 load balancing:** Full inspection + security
+ 
+**4. Use when:** Need both security + advanced LB features
+
+**5. Inspection possible:** LB checks traffic + backend still secure
+
+**6. Recommended:** Best for enterprise/security-critical apps
+
+| Feature               | Passthrough | Offloading    | Bridging            |
+| --------------------- | ----------- | ------------- | ------------------- |
+| Decryption            | Backend     | Load Balancer | Both (LB + Backend) |
+| Encryption End-to-End | Yes         | No Partial    | Yes                 |
+| Inspection            | No          | Yes           | Yes                 |
+| Security              | High        | Medium        | Very High           |
+| Performance           | Medium      | Fast          | Slower              |
+| Speed                 | Medium      | Fast          | Slow                |
+| Inspection            | No          | Yes           | Yes                 |
