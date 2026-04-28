@@ -120,7 +120,7 @@ data:
 -	It stores all cluster state: Pods, Services, Deployments, ConfigMaps, Secrets
 
 **4. Pod reads ConfigMap:** When a Pod needs configuration, the Kubelet fetches the ConfigMap from the API Server, which retrieves it from etcd.
-Architecture: ConfigMap YAMLkubectlAPI Serveretcd (stores ConfigMap data)PodContainer reads configuration
+Architecture: ConfigMap YAML --> kubectl --> API Serveretcd (stores ConfigMap data) --> Pod --> Container reads configuration
 
 #### Important Points
 * Stored in etcd
