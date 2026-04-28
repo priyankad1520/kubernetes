@@ -226,6 +226,7 @@ Because load balancer **can’t see inside encrypted traffic**
 **5. No inspection:** Load balancer cannot see data
 
 **6. Recommended (in some cases):** When strict encryption is required
+---
 #### SSL Offloding
 **1. Fast processing:** Load balancer handles SSL → backend is free
 
@@ -238,6 +239,7 @@ Because load balancer **can’t see inside encrypted traffic**
 **5. Inspection possible:** LB can filter, route, apply WAF
 
 **6. Not recommended for high security:** Because internal traffic is not encrypted
+---
 #### SSL Bridging
 **1. Costly:** Decrypt + re-encrypt → more CPU
 
@@ -250,7 +252,7 @@ Because load balancer **can’t see inside encrypted traffic**
 **5. Inspection possible:** LB checks traffic + backend still secure
 
 **6. Recommended:** Best for enterprise/security-critical apps
-
+---
 | Feature               | Passthrough | Offloading    | Bridging            |
 | --------------------- | ----------- | ------------- | ------------------- |
 | Decryption            | Backend     | Load Balancer | Both (LB + Backend) |
